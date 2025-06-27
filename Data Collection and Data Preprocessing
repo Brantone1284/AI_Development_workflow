@@ -1,0 +1,62 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
+import xgboost as xgb
+import joblib
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder
+
+# 1. Data Collection
+# Load dataset
+df = pd.read_csv('hospital_readmissions.csv')
+
+# 2. Data Preprocessing
+# Handle missing values in A1C_Result
+df['A1C_Result'] = df['A1C_Result'].fillna('Unknown')
+
+# Handle Age outliers (cap at 100)
+df['Age'] = df['Age'].apply(lambda x: np.nan if x > 100 else x)
+df['Age'].fillna(df['Age'].median(), inplace=True)
+
+# Standardize categorical columns
+df['Gender'] = df['Gender'].apply(lambda x: x if x in ['Male', 'Female', 'Other'] else 'Other')
+df['Admission_Type'] = df['Admission_Type'].apply(lambda x: x if x in ['Emergency', 'Urgent', 'Elective'] else 'Unknown')
+df['Diagnosis'] = df['Diagnosis'].apply(lambda x: x if x in ['Heart Disease', 'Diabetes', 'Injury', 'Infection'] else 'Unknown')
+df['Readmitted'] = df['Readmitted'].apply(lambda x: 1 if x == 'Yes' else 0)  # Convert to binary
+
+# Drop Patient_ID (not predictive)
+df = df.drop('Patient_ID', axis=1)
+
+# Define features and target
+X = df.drop('Readmitted', axis=1)
+y = df['Readmitted']
+
+# Check class distribution
+print("Class distribution in y:")
+print(y.value_counts())
+
+# Define numeric and categorical columns
+numeric_cols = ['Age', 'Num_Lab_Procedures', 'Num_Medications', 'Num_Outpatient_Visits', 
+                'Num_Inpatient_Visits', 'Num_Emergency_Visits', 'Num_Diagnoses']
+categorical_cols = ['Gender', 'Admission_Type', 'Diagnosis', 'A1C_Result']
+
+# Create preprocessing pipeline
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', StandardScaler(), numeric_cols),
+        ('cat', OneHotEncoder(drop='first', sparse_output=False), categorical_cols)  # Fixed typo: hidden_cols → categorical_cols
+    ])
+
+# Split data into training and testing sets with stratification
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+# Check class distribution in train and test sets
+print("\nClass distribution in y_train:")
+print(y_train.value_counts())
+print("\nClass distribution in y_test:")
+print(y_test.value_counts())
